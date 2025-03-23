@@ -1,12 +1,15 @@
 #pragma once
 
 #include "byte_stream.hh"
+#include <deque>
 
 class Reassembler
 {
 public:
   // Construct Reassembler to write into given ByteStream.
-  explicit Reassembler( ByteStream&& output ) : output_( std::move( output ) ) {}
+  explicit Reassembler( ByteStream&& output ) :
+	output_( std::move( output ) ),
+	end_index(0xffffffff)	{}
 
   /*
    * Insert a new substring to be reassembled into a ByteStream.
@@ -43,4 +46,18 @@ public:
 
 private:
   ByteStream output_;
+ 	std::deque<char> rbuf = {};
+	std::deque<bool> rbuf_bit = {};
+	uint64_t end_index;	
+
+	uint64_t buf_base() const { return reader().bytes_popped(); }
+	uint64_t frag_base() const { return writer().bytes_pushed(); }
+	uint64_t end_base() const { return frag_base() + writer().available_capacity(); }
+
+	void check_and_close() {
+		if (buf_base() >= end_index) {
+			output_.writer().close();
+		}
+	}
+
 };
