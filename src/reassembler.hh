@@ -55,7 +55,7 @@ private:
 	uint64_t end_base() const { return frag_base() + writer().available_capacity(); }
 
 	void check_and_close() {
-		if (buf_base() >= end_index) {
+		if (frag_base() >= end_index) {
 			output_.writer().close();
 		}
 	}
