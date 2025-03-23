@@ -4,6 +4,8 @@
 #include <string>
 #include <string_view>
 
+#include <queue>
+
 class Reader;
 class Writer;
 
@@ -25,6 +27,14 @@ protected:
   // Please add any additional state to the ByteStream here, and not to the Writer and Reader interfaces.
   uint64_t capacity_;
   bool error_ {};
+
+	std::queue<std::string> buf_ = {}; // 1
+	uint64_t wr_count;
+	uint64_t pop_count;
+	uint64_t buf_count;
+	uint64_t head_buf_len;
+	bool close_;
+
 };
 
 class Writer : public ByteStream
