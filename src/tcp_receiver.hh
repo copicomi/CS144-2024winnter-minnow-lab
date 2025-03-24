@@ -3,6 +3,7 @@
 #include "reassembler.hh"
 #include "tcp_receiver_message.hh"
 #include "tcp_sender_message.hh"
+#include <iostream>
 
 class TCPReceiver
 {
@@ -25,6 +26,15 @@ public:
   const Reader& reader() const { return reassembler_.reader(); }
   const Writer& writer() const { return reassembler_.writer(); }
 
+  void set_error() {std::cout << "TCP ERROR!" << std::endl; reader().set_error(); RST = true; }
+
 private:
   Reassembler reassembler_;
+  	bool RST {};
+	bool SYN {};
+	bool FIN {};
+	
+	Wrap32 SYN_index {0};
+	Wrap32 FIN_index {0};
+	
 };
