@@ -10,7 +10,7 @@ void TCPReceiver::receive( TCPSenderMessage message )
 
 	if (message.RST == true) {
 		RST = true;
-		set_error();
+		reader().set_error();
 	}	
 
 	if (message.SYN == true) {
@@ -46,7 +46,7 @@ TCPReceiverMessage TCPReceiver::send() const
 	if (SYN == true) {
 		message.ackno = ackno;
 	}
-		message.RST = has_error();
+		message.RST = writer().has_error();
 		message.window_size = writer().available_capacity() > 65535 ? 65535 : writer().available_capacity();
 
 	return message;
