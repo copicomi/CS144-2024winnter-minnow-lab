@@ -22,7 +22,7 @@ public:
 	void start() { timer = 0; is_started = true; }
 	void stop() { timer = 0; is_started = false; }
 	void update( uint64_t ms_since_last_tick ) { timer += ms_since_last_tick; }
-	
+
 	// RTO 修改
 	void reset_RTO() { set_RTO_ms_(initial_RTO_ms_); }
 	void double_RTO() { set_RTO_ms_(RTO_ms_ * 2); }
@@ -69,7 +69,7 @@ public:
   const Reader& reader() const { return input_.reader(); }
   Writer& writer() { return input_.writer(); }
 
-  Wrap32 head_seqno() const { return isn_ + reader().bytes_popped() + SYN; }
+  Wrap32 head_seqno() const { return isn_ + reader().bytes_popped() + SYN + FIN; }
 
 private:
   Reader& reader() { return input_.reader(); }

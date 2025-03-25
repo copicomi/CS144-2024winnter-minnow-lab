@@ -95,6 +95,8 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
 
 		reTimer.reset_RTO();
 
+		resend_count = 0;
+
 	}
 
 	// 检查是否仍有未收到的包，更新计时器
@@ -114,6 +116,13 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
 	if (reTimer.overtime() == true) {
 		transmit(lost_messages.front());
 		// TODO : 如果窗口非空，还要进行操作
+		if (window_size > 0) {
+			
+			resend_count ++;
+
+			reTimer.double_RTO();
+		}
+		
 
 		reTimer.start();
 	}
