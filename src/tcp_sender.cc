@@ -83,10 +83,12 @@ TCPSenderMessage TCPSender::make_empty_message() const
 
 void TCPSender::receive( const TCPReceiverMessage& msg )
 {
+	// 更新窗口大小
 	window_size = msg.window_size;
 
 	// 检查 ackno，移除已经收到的包
-	while (lost_messages.empty() == false && !(msg.ackno == lost_messages.front().seqno) ) {
+	while ( lost_messages.empty() == false && msg.ackno > lost_messages.front().seqno && 
+		 									  msg.ackno <= lost_messages.front().seqno + flight_count) {
 
 		flight_count -= lost_messages.front().sequence_length();
 		lost_messages.pop();
