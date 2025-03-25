@@ -14,8 +14,7 @@ uint64_t TCPSender::sequence_numbers_in_flight() const
 // This function is for testing only; don't add extra state to support it.
 uint64_t TCPSender::consecutive_retransmissions() const
 {
-  debug( "unimplemented consecutive_retransmissions() called" );
-  return {};
+	return resend_count;
 }
 
 void TCPSender::push( const TransmitFunction& transmit )
@@ -38,8 +37,8 @@ void TCPSender::push( const TransmitFunction& transmit )
 		SYN = true;
 	}
 
-	// FIN
-	if (FIN == false && flight_count == 0 && reader().is_finished() == true) {
+	// assume FIN followed
+	if (FIN == false && writer().is_closed() == true && message.SYN + reader().bytes_buffered() + 1 <= segment_len) {
 		message.FIN = true;
 		FIN = true;
 	}
@@ -65,6 +64,10 @@ void TCPSender::push( const TransmitFunction& transmit )
 		lost_messages.push(message);
 
 		flight_count += message.sequence_length();
+
+		if (reTimer.running() == false) {
+			reTimer.start();
+		}
 
 	}
 }
@@ -103,6 +106,14 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
 
 void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& transmit )
 {
-  debug( "unimplemented tick({}, ...) called", ms_since_last_tick );
-  (void)transmit;
+
+	reTimer.update(ms_since_last_tick);
+	
+	if (reTimer.overtime() == true) {
+		transmit(lost_messages.front());
+		// TODO : 如果窗口非空，还要进行操作
+
+		reTimer.start();
+	}
+	
 }
