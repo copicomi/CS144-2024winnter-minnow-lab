@@ -18,6 +18,7 @@ uint64_t TCPSender::consecutive_retransmissions() const
 	return resend_count;
 }
 
+
 void TCPSender::push( const TransmitFunction& transmit )
 {
 
@@ -25,7 +26,13 @@ void TCPSender::push( const TransmitFunction& transmit )
 
 	const uint64_t &MAX = TCPConfig::MAX_PAYLOAD_SIZE;
 
-	for (uint64_t i = flight_count; i < window_size && FIN == false; /* i 的更新放在循环最后 */) {
+	uint16_t assume_window_size = 1;
+	if (window_size > 1) {
+		assume_window_size = window_size;
+	}
+
+
+	for (uint64_t i = flight_count; i < assume_window_size && FIN == false; /* i 的更新放在循环最后 */) {
 
 		TCPSenderMessage message;
 		
@@ -40,7 +47,7 @@ void TCPSender::push( const TransmitFunction& transmit )
 	
 		// assume FIN followed
 		if (FIN == false && writer().is_closed() == true &&
-			   	i + message.SYN + min(reader().bytes_buffered(), MAX) < window_size) {
+			   	i + message.SYN + min(reader().bytes_buffered(), MAX) < assume_window_size) {
 			message.FIN = true;
 			FIN = true;
 		}
@@ -49,7 +56,7 @@ void TCPSender::push( const TransmitFunction& transmit )
 		uint64_t payload_len = min( min(
 				   					MAX,
 				   					reader().bytes_buffered() ) ,
-			   						window_size - i - message.SYN - message.FIN );
+			   						assume_window_size - i - message.SYN - message.FIN );
 	
 		read(reader(), payload_len, message.payload);
 	
