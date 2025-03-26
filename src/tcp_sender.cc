@@ -114,6 +114,10 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
 
 	uint64_t msg_abs_seqno = abs_seqno(msg.ackno.value_or(Wrap32(0)));
 
+	if (msg.RST == true) {
+		writer().set_error();
+	}
+
 	// 检查 ackno，移除已经收到的包
 	while ( lost_messages.empty() == false &&
 		   	msg_abs_seqno > lost_msg_abs_seqno() && 
@@ -129,6 +133,7 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
 		received_new_data = true;
 
 	}
+
 
 	// 更新窗口大小
 	window_size = msg.window_size;
