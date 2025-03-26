@@ -46,8 +46,13 @@ void TCPSender::push( const TransmitFunction& transmit )
 		}
 	
 		// assume FIN followed
-		if (FIN == false && writer().is_closed() == true &&
-			   	i + message.SYN + min(reader().bytes_buffered(), MAX) < assume_window_size) {
+		if ( FIN == false && writer().is_closed() == true &&
+			   	i + message.SYN + reader().bytes_buffered() < assume_window_size &&
+				min( min( 
+						MAX,
+					   	reader().bytes_buffered() ) ,
+					    assume_window_size - i - message.SYN - 1 ) 
+			    == reader().bytes_buffered() )	{
 			message.FIN = true;
 			FIN = true;
 		}
@@ -97,6 +102,8 @@ TCPSenderMessage TCPSender::make_empty_message() const
 	TCPSenderMessage message;
 
 	message.seqno = head_seqno();		
+
+	message.RST = writer().has_error();
 	
 	return message;
 }
