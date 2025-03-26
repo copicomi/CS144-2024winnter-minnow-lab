@@ -21,14 +21,14 @@ uint64_t TCPSender::consecutive_retransmissions() const
 void TCPSender::push( const TransmitFunction& transmit )
 {
 
-	// 检查 payload 长度
-	uint64_t total_segment_len = window_size - flight_count;
+	// 窗口分为两段 : [0, flight_count - 1], [flight_count, window_size - 1]
 
-	for (uint64_t i = 0; i < total_segment_len; i += TCPConfig::MAX_PAYLOAD_SIZE) {
+	const uint64_t &MAX = TCPConfig::MAX_PAYLOAD_SIZE;
+
+	for (uint64_t i = flight_count; i < window_size && FIN == false; /* i 的更新放在循环最后 */) {
 
 		TCPSenderMessage message;
 		
-		uint64_t segment_len = min(total_segment_len - i, TCPConfig::MAX_PAYLOAD_SIZE);
 		// 头序号
 		message.seqno = head_seqno();
 	
@@ -39,13 +39,17 @@ void TCPSender::push( const TransmitFunction& transmit )
 		}
 	
 		// assume FIN followed
-		if (FIN == false && writer().is_closed() == true && message.SYN + reader().bytes_buffered() + 1 <= segment_len) {
+		if (FIN == false && writer().is_closed() == true &&
+			   	i + message.SYN + min(reader().bytes_buffered(), MAX) < window_size) {
 			message.FIN = true;
 			FIN = true;
 		}
 	
 		// payload
-		uint64_t payload_len = segment_len - message.SYN - message.FIN;
+		uint64_t payload_len = min( min(
+				   					MAX,
+				   					reader().bytes_buffered() ) ,
+			   						window_size - i - message.SYN - message.FIN );
 	
 		read(reader(), payload_len, message.payload);
 	
@@ -71,6 +75,13 @@ void TCPSender::push( const TransmitFunction& transmit )
 			}
 
 		}
+		// 无信息就退出
+		else {
+			break;
+		}
+
+		// 更新 i
+		i += message.sequence_length();
 	}
 }
 
