@@ -71,6 +71,9 @@ public:
 
   Wrap32 head_seqno() const { return isn_ + reader().bytes_popped() + SYN + FIN; }
 
+  uint64_t abs_seqno( Wrap32 seqno ) { return seqno.unwrap(isn_, reader().bytes_popped()); }
+  uint64_t lost_msg_abs_seqno() { return lost_messages.size() > 0 ? abs_seqno( lost_messages.front().seqno ) : 0; }
+
 private:
   Reader& reader() { return input_.reader(); }
 

@@ -85,14 +85,18 @@ TCPSenderMessage TCPSender::make_empty_message() const
 
 void TCPSender::receive( const TCPReceiverMessage& msg )
 {
-	// 更新窗口大小
-	window_size = msg.window_size;
-
 	bool received_new_data = false;
 
+	uint64_t msg_abs_seqno = abs_seqno(msg.ackno.value_or(Wrap32(0)));
+
 	// 检查 ackno，移除已经收到的包
-	while ( lost_messages.empty() == false && msg.ackno > lost_messages.front().seqno && 
-		 									  msg.ackno <= lost_messages.front().seqno + flight_count) {
+	while ( lost_messages.empty() == false &&
+		   	msg_abs_seqno > lost_msg_abs_seqno() && 
+		 	msg_abs_seqno <= lost_msg_abs_seqno() + flight_count ) {
+
+		// 不是整块，先忽略（待定）
+		if (msg_abs_seqno < lost_msg_abs_seqno() + lost_messages.front().sequence_length() ) 
+			return;
 
 		flight_count -= lost_messages.front().sequence_length();
 		lost_messages.pop();
@@ -100,6 +104,9 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
 		received_new_data = true;
 
 	}
+
+	// 更新窗口大小
+	window_size = msg.window_size;
 
 	// 检查是否仍有未收到的包，更新计时器
 	if (received_new_data == true) {
