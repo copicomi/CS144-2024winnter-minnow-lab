@@ -25,6 +25,8 @@ NetworkInterface::NetworkInterface( string_view name,
        << ip_address.ip() << "\n";
 }
 
+
+
 //! \param[in] dgram the IPv4 datagram to be sent
 //! \param[in] next_hop the IP address of the interface to send it to (typically a router or default gateway, but
 //! may also be another host if directly connected to the same network as the destination) Note: the Address type
@@ -35,13 +37,33 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 
 	if ( ip2mac_.count(next_ip) == 0 ) { // 表中无映射
 
-		datagrams_waiting_arp_[next_ip].push(dgram);
-
-		EthernetFrame msg_arp;
-
-		/* */
+		datagrams_waiting_arp_[next_ip].push({dgram, next_hop});
 
 		if (arp_sent_.count(next_ip) == 0) {
+			EthernetFrame msg_arp;
+				// 构造 ARP 请求
+
+				ARPMessage arp_request;
+			{
+
+				arp_request.opcode = ARPMessage::OPCODE_REQUEST;
+
+				arp_request.sender_ip_address = ip_address_.ipv4_numeric();
+				arp_request.sender_ethernet_address = ethernet_address_;
+
+				arp_request.target_ip_address = next_hop.ipv4_numeric();
+				arp_request.target_ethernet_address = {};
+
+			}
+
+				Serializer serializer;
+				arp_request.serialize(serializer);
+
+			msg_arp.header.type = EthernetHeader::TYPE_ARP;
+			msg_arp.header.src = ethernet_address_;
+			msg_arp.header.dst = ETHERNET_BROADCAST;
+			msg_arp.payload = serializer.finish();
+
 			transmit(msg_arp);
 			
 			arp_sent_[next_ip] = 5000; // 5000 ms
@@ -51,9 +73,16 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 
 		EthernetAddress dst_addr = ip2mac_[next_ip].ethernet_address;
 
+		Serializer serializer;
+		dgram.serialize(serializer);
+
 		EthernetFrame msg_ipv4;
 
 		/* 构造 msg */
+		msg_ipv4.header.type = EthernetHeader::TYPE_IPv4;
+		msg_ipv4.header.src = ethernet_address_;
+		msg_ipv4.header.dst = dst_addr;
+		msg_ipv4.payload = serializer.finish();
 
 		transmit(msg_ipv4);
 	}
@@ -62,32 +91,28 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 //! \param[in] frame the incoming Ethernet frame
 void NetworkInterface::recv_frame( EthernetFrame frame )
 {
-	
+	(void)	frame;
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void NetworkInterface::tick( const size_t ms_since_last_tick )
 {
 	for (auto &[ip, tick_time] : arp_sent_) {
-		tick_time -= ms_since_last_tick;
-		if (tick_time < 0) {
+		if (tick_time <= ms_since_last_tick) {
 			arp_sent_.erase(ip);
+			/* 查找是否有 ipDatagram 在等待 ip 的 arp 回复，不重发，直接丢弃 */
+			if ( datagrams_waiting_arp_.count(ip) > 0 ) {
+	
+				arp_sent_.erase(ip);
+			}
 		}
-		/* 查找是否有 ipDatagram 在等待 ip 的 arp 回复，有就重发 arp 请求 */
-		if ( datagrams_waiting_arp_.count(ip) > 0 && datagrams_waiting_arp_[ip].empty() != true ) {
-
-			EthernetFrame msg_arp;
-
-			/* 构造 arp 请求 */
-
-			transmit(msg_arp);
-		}
+		tick_time -= ms_since_last_tick;
 	}
 
 	for (auto &[ip, pa] : ip2mac_) {
-		pa.tick_time -= ms_since_last_tick;
-		if (pa.tick_time < 0) {
-			arp_sent_.erase(ip);
+		if (pa.tick_time <= ms_since_last_tick) {
+			ip2mac_.erase(ip);
 		}
+		pa.tick_time -= ms_since_last_tick;
 	}
 }
