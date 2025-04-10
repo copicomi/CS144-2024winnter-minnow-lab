@@ -7,6 +7,7 @@
 #include <memory>
 #include <queue>
 
+#include <map>
 // A "network interface" that connects IP (the internet layer, or network layer)
 // with Ethernet (the network access layer, or link layer).
 
@@ -82,4 +83,18 @@ private:
 
   // Datagrams that have been received
   std::queue<InternetDatagram> datagrams_received_ {};
+
+  // 维护 arp 请求的映射，5s内不重复请求
+  std::map< Address, size_t > arp_sent_ {};
+
+  // 维护 正在等待 arp 回复的 ip 数据报
+  std::map< Address, std::queue< InternetDatagram > > datagrams_waiting_arp_ {};
+
+  // 维护 mac 地址映射，30s后删除
+  class Eaddr {
+	  EthernetAddress ethernet_address;
+	  size_t tick_time;
+  }
+  std::map< Address, Eaddr > ip2mac_;
+
 };
