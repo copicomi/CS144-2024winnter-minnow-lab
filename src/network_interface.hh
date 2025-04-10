@@ -7,7 +7,7 @@
 #include <memory>
 #include <queue>
 
-#include <map>
+#include <unordered_map>
 // A "network interface" that connects IP (the internet layer, or network layer)
 // with Ethernet (the network access layer, or link layer).
 
@@ -67,6 +67,15 @@ public:
   OutputPort& output() { return *port_; }
   std::queue<InternetDatagram>& datagrams_received() { return datagrams_received_; }
 
+  // 构造 arp frame
+  EthernetFrame make_arp_eframe(const uint16_t &opcode,
+		  						const EthernetAddress &src_ethernet_address,
+								const Address &src_ip_address,
+								const EthernetAddress &dst_ethernet_address,
+								const Address &dst_ip_address);
+
+  EthernetFrame make_ip_eframe(const InternetDatagram &dgram, const EthernetAddress &dst_ethernet_address);
+
 private:
   // Human-readable name of the interface
   std::string name_;
@@ -85,20 +94,16 @@ private:
   std::queue<InternetDatagram> datagrams_received_ {};
 
   // 维护 arp 请求的映射，5s内不重复请求
-  std::map< uint32_t, size_t > arp_sent_ {};
+  std::unordered_map< uint32_t, size_t > arp_sent_ {};
 
   // 维护 正在等待 arp 回复的 ip 数据报
-  struct dgram_to_send{
-	  InternetDatagram dgram;
-	  Address next_hop;
-  };
-  std::map< uint32_t, std::queue< dgram_to_send > > datagrams_waiting_arp_ {};
+  std::unordered_map< uint32_t, std::queue<InternetDatagram> > datagrams_waiting_arp_ {};
 
   // 维护 mac 地址映射，30s后删除
   struct Eaddr {
 	  EthernetAddress ethernet_address;
 	  size_t tick_time;
   };
-  std::map< uint32_t, Eaddr > ip2mac_ {};
+  std::unordered_map< uint32_t, Eaddr > ip2mac_ {};
 
 };
