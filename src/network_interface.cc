@@ -190,6 +190,10 @@ void NetworkInterface::tick( const size_t ms_since_last_tick )
 	for (auto &[ip, tick_time] : arp_sent_) {
 		if (tick_time <= ms_since_last_tick) {
 			arp_sent_.erase(ip);
+			if (datagrams_waiting_arp_.count(ip) > 0) {
+				datagrams_waiting_arp_.erase(ip);
+			}
+			break;
 		}
 		tick_time -= ms_since_last_tick;
 	}
@@ -197,6 +201,7 @@ void NetworkInterface::tick( const size_t ms_since_last_tick )
 	for (auto &[ip, pa] : ip2mac_) {
 		if (pa.tick_time <= ms_since_last_tick) {
 			ip2mac_.erase(ip);
+			break;
 		}
 		pa.tick_time -= ms_since_last_tick;
 	}
