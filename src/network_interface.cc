@@ -93,7 +93,7 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 
 	if ( ip2mac_.count(next_ip) == 0 ) { // 表中无映射
 
-		datagrams_waiting_arp_[next_ip].push(dgram);
+		datagrams_waiting_arp_[next_ip].push({ dgram, _local_clock });
 
 		if (arp_sent_.count(next_ip) == 0) {
 
@@ -105,7 +105,7 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 
 			transmit(eframe);
 			
-			arp_sent_[next_ip] = 5000; // 5000 ms
+			arp_sent_[next_ip] = _local_clock; // 5000 ms
 		}
 	}
 	else { // 有映射
@@ -145,7 +145,7 @@ void NetworkInterface::recv_frame( EthernetFrame frame )
 		uint32_t src_ip = arp_msg.sender_ip_address;
 		EthernetAddress src_mac = arp_msg.sender_ethernet_address;
 
-		ip2mac_[src_ip] = {src_mac, 30000}; // 30000 ms
+		ip2mac_[src_ip] = {src_mac, _local_clock}; // 30000 ms
 
 		if (arp_msg.opcode == ARPMessage::OPCODE_REQUEST
 				&& arp_msg.target_ip_address == ip_address_.ipv4_numeric()) { // 发给本机的 ARP 请求
@@ -166,14 +166,21 @@ void NetworkInterface::recv_frame( EthernetFrame frame )
 				auto& dgram_queue = datagrams_waiting_arp_[src_ip];
 
 				while (dgram_queue.size() > 0) {
-					
-					InternetDatagram dgram = dgram_queue.front();
+					size_t tick_time = dgram_queue.front().tick_time;
+
+					InternetDatagram dgram = dgram_queue.front().dgram;
+
+					dgram_queue.pop();
+
+					if (tick_time <= _local_clock && tick_time + 5000 <= _local_clock) {
+						continue;
+					}
+
 
 					EthernetFrame eframe = make_ip_eframe(dgram, ip2mac_[src_ip].ethernet_address);
 
 					transmit(eframe);
 
-					dgram_queue.pop();
 
 				}
 
@@ -187,22 +194,19 @@ void NetworkInterface::recv_frame( EthernetFrame frame )
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void NetworkInterface::tick( const size_t ms_since_last_tick )
 {
+	_local_clock += ms_since_last_tick;
+
 	for (auto &[ip, tick_time] : arp_sent_) {
-		if (tick_time <= ms_since_last_tick) {
+		if (tick_time <= _local_clock && tick_time + 5000 <= _local_clock) {
 			arp_sent_.erase(ip);
-			if (datagrams_waiting_arp_.count(ip) > 0) {
-				datagrams_waiting_arp_.erase(ip);
-			}
 			break;
 		}
-		tick_time -= ms_since_last_tick;
 	}
 
 	for (auto &[ip, pa] : ip2mac_) {
-		if (pa.tick_time <= ms_since_last_tick) {
+		if (pa.tick_time <= _local_clock && pa.tick_time + 30000 <= _local_clock) {
 			ip2mac_.erase(ip);
 			break;
 		}
-		pa.tick_time -= ms_since_last_tick;
 	}
 }

@@ -97,7 +97,11 @@ private:
   std::unordered_map< uint32_t, size_t > arp_sent_ {};
 
   // 维护 正在等待 arp 回复的 ip 数据报
-  std::unordered_map< uint32_t, std::queue<InternetDatagram> > datagrams_waiting_arp_ {};
+  struct Dgram {
+	  InternetDatagram dgram;
+	  size_t tick_time;
+  };
+  std::unordered_map< uint32_t, std::queue<Dgram> > datagrams_waiting_arp_ {};
 
   // 维护 mac 地址映射，30s后删除
   struct Eaddr {
@@ -106,4 +110,5 @@ private:
   };
   std::unordered_map< uint32_t, Eaddr > ip2mac_ {};
 
+  size_t _local_clock {};
 };
