@@ -31,21 +31,26 @@ NetworkInterface::NetworkInterface( string_view name,
 //! can be converted to a uint32_t (raw 32-bit IP address) by using the Address::ipv4_numeric() method.
 void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Address& next_hop )
 {
-	if ( ip2mac_.count(next_hop) == 0 ) { // 表中无映射
+	uint32_t next_ip = next_hop.ipv4_numeric();
 
-		datagrams_waiting_arp_[next_hop].push(dgram);
+	if ( ip2mac_.count(next_ip) == 0 ) { // 表中无映射
+
+		datagrams_waiting_arp_[next_ip].push(dgram);
 
 		EthernetFrame msg_arp;
 
 		/* */
 
-		if (arp_sent_.count(next_hop) == 0) {
+		if (arp_sent_.count(next_ip) == 0) {
 			transmit(msg_arp);
 			
-			arp_sent_[next_hop] = 5000; // 5000 ms
+			arp_sent_[next_ip] = 5000; // 5000 ms
 		}
 	}
 	else { // 有映射
+
+		EthernetAddress dst_addr = ip2mac_[next_ip].ethernet_address;
+
 		EthernetFrame msg_ipv4;
 
 		/* 构造 msg */
@@ -57,8 +62,7 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 //! \param[in] frame the incoming Ethernet frame
 void NetworkInterface::recv_frame( EthernetFrame frame )
 {
-  debug( "unimplemented recv_frame called" );
-  (void)frame;
+	
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
@@ -67,6 +71,22 @@ void NetworkInterface::tick( const size_t ms_since_last_tick )
 	for (auto &[ip, tick_time] : arp_sent_) {
 		tick_time -= ms_since_last_tick;
 		if (tick_time < 0) {
+			arp_sent_.erase(ip);
+		}
+		/* 查找是否有 ipDatagram 在等待 ip 的 arp 回复，有就重发 arp 请求 */
+		if ( datagrams_waiting_arp_.count(ip) > 0 && datagrams_waiting_arp_[ip].empty() != true ) {
+
+			EthernetFrame msg_arp;
+
+			/* 构造 arp 请求 */
+
+			transmit(msg_arp);
+		}
+	}
+
+	for (auto &[ip, pa] : ip2mac_) {
+		pa.tick_time -= ms_since_last_tick;
+		if (pa.tick_time < 0) {
 			arp_sent_.erase(ip);
 		}
 	}
