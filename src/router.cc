@@ -16,7 +16,7 @@ void Router::add_route( const uint32_t route_prefix,
                         const optional<Address> next_hop,
                         const size_t interface_num )
 {
-  cerr << "DEBUG: adding route " << Address::from_ipv4_numeric( route_prefix ).ip() << "/"
+   cerr << "DEBUG: adding route " << Address::from_ipv4_numeric( route_prefix ).ip() << "/"
        << static_cast<int>( prefix_length ) << " => " << ( next_hop.has_value() ? next_hop->ip() : "(direct)" )
        << " on interface " << interface_num << "\n";
 
@@ -27,8 +27,9 @@ void Router::add_route( const uint32_t route_prefix,
 
 bool Router::get_route(const InternetDatagram& dgram, Address& out_address, size_t& interface_num) {
 	uint32_t dst_addr = dgram.header.dst;
-	uint32_t mask = 0 - 1;
-	for (uint8_t pre_len = 32, i = 1; pre_len > 0; pre_len --, mask -= i, i <<= 1) {
+	uint32_t mask = (1u << 31) - 1;
+	mask = (mask << 1) | 1;
+	for (int pre_len = 32, i = 1; pre_len >= 0; pre_len --, mask -= i, i <<= 1) {
 		uint32_t ip_prefix = dst_addr & mask;
 		if (route_list[pre_len].count(ip_prefix) > 0) {
 			auto pa = route_list[pre_len][ip_prefix];
@@ -41,6 +42,7 @@ bool Router::get_route(const InternetDatagram& dgram, Address& out_address, size
 			}
 			return true;
 		}
+
 	}	
 	return false;
 }
@@ -53,9 +55,9 @@ void Router::route_datagram(InternetDatagram& dgram) {
 	uint8_t& ttl = dgram.header.ttl;
 
 
-
 	if (ttl > 0 && -- ttl > 0 && get_route(dgram, out_address, interface_num ) == true) {
 		
+		dgram.header.compute_checksum();
 		interface(interface_num)->send_datagram(dgram, out_address);
 
 	}
@@ -69,7 +71,7 @@ void Router::route()
 
 		auto& dgrams_ = interface(index)->datagrams_received();
 		
-		while (dgrams_.empty() == false) {
+		while (dgrams_.size() > 0) {
 
 			route_datagram(dgrams_.front());
 
